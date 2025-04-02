@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
 from collections import Counter
+from imblearn.over_sampling import SMOTE  # Import SMOTE for balancing the dataset
 
 app = Flask(__name__)
 
@@ -43,40 +44,46 @@ def upload_file():
 
         # Display class distribution
         class_distribution = Counter(Y)
-        print(f"Class Distribution: {class_distribution}")
-        
+        print(f"Class Distribution Before SMOTE: {class_distribution}")
+
         # Split the dataset into training and testing sets
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
-        
-        # Compute class weights for handling imbalanced classes
-        class_weights = compute_class_weight('balanced', classes=np.unique(Y), y=Y)
-        class_weight_dict = dict(zip(np.unique(Y), class_weights))
 
-        # Initialize and train the Random Forest model with class weights
+        # Apply SMOTE to balance the dataset
+        smote = SMOTE(random_state=42)
+        X_train_resampled, Y_train_resampled = smote.fit_resample(X_train, Y_train)
+
+        # Display new class distribution after SMOTE
+        class_distribution_after = Counter(Y_train_resampled)
+        print(f"Class Distribution After SMOTE: {class_distribution_after}")
+
+        # Compute class weights for handling imbalanced classes
+        class_weights = compute_class_weight('balanced', classes=np.unique(Y_train_resampled), y=Y_train_resampled)
+        class_weight_dict = dict(zip(np.unique(Y_train_resampled), class_weights))
+
+        # Initialize and train the Random Forest model with balanced data
         model = RandomForestClassifier(n_estimators=100, class_weight=class_weight_dict, random_state=42)
-        model.fit(X_train, Y_train)
-        
+        model.fit(X_train_resampled, Y_train_resampled)
+
         # Calculate feature importances
         feature_importances = model.feature_importances_
-
-        # Map feature names to their importance values
         feature_importances_dict = dict(zip(X.columns, feature_importances))
-        
+
         # Perform predictions and calculate accuracy
         predictions = model.predict(X_test)
         accuracy = accuracy_score(Y_test, predictions)
-        
+
         # Confusion Matrix
         cm = confusion_matrix(Y_test, predictions)
         print(f"Confusion Matrix:\n{cm}")
-        
-        # Count fraudulent and legitimate transactions
+
+        # Count fraudulent and legitimate transactions in predictions
         fraudulent_count = (predictions == 1).sum()
         legitimate_count = (predictions == 0).sum()
-        
+
         # Calculate fraud percentage
         fraud_percentage = (fraudulent_count / len(predictions)) * 100
-        
+
         # Render the results to the result.html template
         return render_template(
             'result.html',
@@ -93,3 +100,4 @@ def upload_file():
 
 if __name__ == "__main__":
     app.run(debug=True)
+    
