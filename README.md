@@ -78,7 +78,7 @@ python app.py
 ```
 ## 💻 Usage
 
-  1.Open the application in your web browser at http://localhost:5000/.
+  1.Open the application in your web browser 
 
   2.Upload a CSV file with transaction data.
 
